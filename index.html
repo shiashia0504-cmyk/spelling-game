@@ -395,7 +395,7 @@
     border: 2px solid transparent;
     margin: 2px;
   }
-  .word-span:hover { background: #FFF3CD; border-color: var(--orange); transform: scale(1.08); }
+  @media (hover: hover) { .word-span:hover { background: #FFF3CD; border-color: var(--orange); transform: scale(1.08); } }
   .word-span.selected-wrong { background: #FFE0E0; border-color: #FF6B6B; animation: shake 0.4s ease; }
   .word-span.selected-right { background: #E0FFE0; border-color: var(--grass); }
   .word-span.error-word { background: #FFB3C1; border-color: var(--pink); }
@@ -519,7 +519,7 @@
     transition: all 0.2s;
     text-align: center;
   }
-  .choice-btn:hover { border-color: var(--purple); background: #F3E8FF; transform: translateY(-3px); }
+  @media (hover: hover) { .choice-btn:hover { border-color: var(--purple); background: #F3E8FF; transform: translateY(-3px); } }
   .choice-btn.correct-ans { border-color: var(--grass); background: #E8FFE8; color: #2d7a2d; }
   .choice-btn.wrong-ans { border-color: #FF6B6B; background: #FFE8E8; color: #c0392b; }
 
