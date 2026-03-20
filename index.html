@@ -755,14 +755,7 @@
       <div style="font-size:22px; color:#aaa; line-height:1.8">아직 선생님이<br>책을 준비하지 않으셨어요!<br><span style="font-size:18px">선생님께 부탁해 보세요 🙏</span></div>
     </div>
 
-    <div class="setup-card" id="diff-card" style="display:none">
-      <div class="setup-label">⚡ 난이도 선택</div>
-      <div class="difficulty-row">
-        <button class="diff-btn selected" onclick="selectDiff(this,'easy')">🌱 쉬움<br><small style="font-size:14px">1학년</small></button>
-        <button class="diff-btn" onclick="selectDiff(this,'normal')">🌳 보통<br><small style="font-size:14px">2학년</small></button>
-        <button class="diff-btn" onclick="selectDiff(this,'hard')">🔥 어려움<br><small style="font-size:14px">심화</small></button>
-      </div>
-    </div>
+
 
     <button class="start-btn" id="start-btn" onclick="startGame()" disabled>
       🎮 게임 시작하기!
@@ -1083,13 +1076,11 @@ async function startStudentListener() {
 function applyBookToStudentScreen(data) {
   const readyCard = document.getElementById('book-ready-card');
   const noBookCard = document.getElementById('no-book-card');
-  const diffCard = document.getElementById('diff-card');
   const startBtn = document.getElementById('start-btn');
 
   if (data && data.questions && data.questions.length > 0) {
     readyCard.style.display = 'block';
     noBookCard.style.display = 'none';
-    diffCard.style.display = 'block';
     startBtn.disabled = false;
     document.getElementById('book-title-display').textContent = '📚 ' + (data.title || '오늘의 책');
     document.getElementById('book-preview-display').textContent = '문제 ' + data.questions.length + '개 준비됨!';
@@ -1097,7 +1088,6 @@ function applyBookToStudentScreen(data) {
   } else {
     readyCard.style.display = 'none';
     noBookCard.style.display = 'block';
-    diffCard.style.display = 'none';
     startBtn.disabled = true;
     window._currentBookData = null;
   }
@@ -1280,11 +1270,7 @@ function renderQuestionList() {
 // ===========================
 // SETUP
 // ===========================
-function selectDiff(el, val) {
-  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
-  el.classList.add('selected');
-  difficulty = val;
-}
+
 
 // ===========================
 // GAME START
@@ -1419,35 +1405,39 @@ function renderGameType(q) {
 }
 
 // FIND ERROR
+// data-idx 방식으로 onclick 인자 전달 → 특수문자 이스케이프 문제 완전 해결
 function renderFindError(q) {
+  // 현재 문제를 전역에 캐시
+  window._feQ = q;
   const words = q.sentence.split(' ');
-  const spans = words.map(w => `<span class="word-span" onclick="clickWord(this,'${w}','${q.errorWord}','${q.correctWord}','${q.explanation}')">${w}</span>`).join(' ');
+  const spans = words.map((w, i) =>
+    `<span class="word-span" data-wi="${i}" onclick="clickWord(this)">${w}</span>`
+  ).join(' ');
   return `<div class="find-error-text">${spans}</div>`;
 }
 
-function clickWord(el, word, errorWord, correctWord, explanation) {
+function clickWord(el) {
   if (el.classList.contains('selected-right') || el.classList.contains('error-word')) return;
-  
-  // Normalize comparison
-  const w = word.replace(/[.,!?~]/g,'');
-  const e = errorWord.replace(/[.,!?~]/g,'');
-  
-  if (w === e || word.includes(e)) {
-    el.classList.add('selected-right');
-    el.classList.add('error-word');
+  const q = window._feQ;
+  const word = el.textContent;
+  const w = word.replace(/[.,!?~\s]/g, '');
+  const e = q.errorWord.replace(/[.,!?~\s]/g, '');
+
+  if (w === e) {
+    el.classList.add('selected-right', 'error-word');
     playSound('correct');
-    showFeedback(true, explanation, 20);
+    showFeedback(true, q.explanation, 20);
   } else {
     el.classList.add('selected-wrong');
     setTimeout(() => el.classList.remove('selected-wrong'), 500);
-    if (hearts > 1) { hearts--; updateHUD(); playSound('wrong'); }
-    else {
-      hearts = 0; updateHUD();
-      // highlight correct
+    hearts = Math.max(0, hearts - 1);
+    updateHUD();
+    playSound('wrong');
+    if (hearts === 0) {
       document.querySelectorAll('.word-span').forEach(s => {
-        if (s.textContent.includes(e)) s.classList.add('error-word');
+        if (s.textContent.replace(/[.,!?~\s]/g,'') === e) s.classList.add('error-word');
       });
-      setTimeout(() => showFeedback(false, explanation, 0), 600);
+      setTimeout(() => showFeedback(false, q.explanation, 0), 600);
     }
   }
 }
@@ -1524,35 +1514,39 @@ function toggleSpace(btn, pos) {
 
 // FILL BLANK
 function renderFillBlank(q) {
+  window._fbQ = q;
   const sentenceWithBlank = q.sentence.replace('___', '<span id="fill-display" style="color:#bbb">___</span>');
-  const choiceButtons = (q.choices || [q.answer,'오답1','오답2','오답3']).map(c =>
-    `<button class="choice-btn" onclick="selectChoice(this,'${c}','${q.answer}','${q.explanation}')">${c}</button>`
+  const choices = q.choices || [q.answer, '오답1', '오답2', '오답3'];
+  const choiceButtons = choices.map((c, i) =>
+    `<button class="choice-btn" data-ci="${i}" onclick="selectChoice(this)">${c}</button>`
   ).join('');
-  
+
   return `
     <div class="fill-blank-text">${sentenceWithBlank}</div>
     <div class="choices-grid" style="margin-top:20px">${choiceButtons}</div>
   `;
 }
 
-function selectChoice(el, chosen, answer, explanation) {
+function selectChoice(el) {
+  const q = window._fbQ;
+  const chosen = el.textContent;
   document.querySelectorAll('.choice-btn').forEach(b => b.onclick = null);
   const display = document.getElementById('fill-display');
   if (display) display.textContent = chosen;
-  
-  if (chosen === answer) {
+
+  if (chosen === q.answer) {
     el.classList.add('correct-ans');
     if (display) display.style.color = 'var(--grass)';
     playSound('correct');
-    showFeedback(true, explanation, 15);
+    showFeedback(true, q.explanation, 15);
   } else {
     el.classList.add('wrong-ans');
-    document.querySelectorAll('.choice-btn').forEach(b => { if (b.textContent === answer) b.classList.add('correct-ans'); });
-    if (display) { display.textContent = answer; display.style.color = '#FF6B6B'; }
+    document.querySelectorAll('.choice-btn').forEach(b => { if (b.textContent === q.answer) b.classList.add('correct-ans'); });
+    if (display) { display.textContent = q.answer; display.style.color = '#FF6B6B'; }
     playSound('wrong');
     hearts = Math.max(0, hearts - 1);
     updateHUD();
-    setTimeout(() => showFeedback(false, explanation, 0), 700);
+    setTimeout(() => showFeedback(false, q.explanation, 0), 700);
   }
 }
 
@@ -1579,15 +1573,27 @@ function checkAnswer() {
     const spaceButtons = document.querySelectorAll('.space-btn');
     const joined = window._spacingJoined;
     const answer = window._spacingAnswer;
-    
-    // Build user's answer
+
+    // 정답에서 공백이 있어야 하는 joined 인덱스 계산
+    // joined의 i번째 문자 뒤에 공백이 있어야 하는지 체크
+    const correctSpaceSet = new Set();
+    let ji = 0; // joined index
+    for (let ai = 0; ai < answer.length - 1; ai++) {
+      if (answer[ai] === ' ') {
+        correctSpaceSet.add(ji - 1); // 공백 직전 joined 인덱스
+      } else {
+        ji++;
+      }
+    }
+
+    // 사용자 답안 문자열 재조합
     let userStr = joined[0];
     spaceButtons.forEach(btn => {
       const pos = parseInt(btn.dataset.pos);
       if (btn.classList.contains('has-space')) userStr += ' ';
       userStr += joined[pos + 1];
     });
-    
+
     if (userStr === answer) {
       spaceButtons.forEach(btn => {
         if (btn.classList.contains('has-space')) btn.classList.add('correct');
@@ -1595,16 +1601,9 @@ function checkAnswer() {
       playSound('correct');
       showFeedback(true, q.explanation, 20);
     } else {
-      // Show correct spacing
-      let correctIdx = 0;
-      let correctSpaces = [];
-      for (let i = 0; i < answer.length; i++) {
-        if (answer[i] === ' ') correctSpaces.push(correctIdx - 1);
-        else correctIdx++;
-      }
       spaceButtons.forEach(btn => {
         const pos = parseInt(btn.dataset.pos);
-        const shouldHave = correctSpaces.includes(pos);
+        const shouldHave = correctSpaceSet.has(pos);
         const hasIt = btn.classList.contains('has-space');
         if (shouldHave !== hasIt) btn.classList.add('incorrect');
         else if (hasIt) btn.classList.add('correct');
